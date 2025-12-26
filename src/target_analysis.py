@@ -470,7 +470,7 @@ def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table:
             box-sizing: border-box;
         }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: Arial, Helvetica, sans-serif;
             margin: 0;
             padding: 0;
             background-color: #f5f5f5;
