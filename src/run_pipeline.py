@@ -80,7 +80,7 @@ def main():
         '--llm-model',
         type=str,
         default='gpt-4o',
-        help='OpenAI model to use (default: gpt-4o, options: gpt-4o, gpt-4-turbo, gpt-3.5-turbo)'
+        help='LLM model to use. OpenAI: gpt-4o, gpt-4-turbo, o1, o1-mini. Gemini: gemini-1.5-pro, gemini-1.5-flash, gemini-2.0-flash-exp'
     )
     parser.add_argument(
         '--no-cache',

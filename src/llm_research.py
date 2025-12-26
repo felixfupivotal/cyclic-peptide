@@ -1,8 +1,12 @@
 """
 LLM-powered Deep Research Module for Cyclic Peptide Drug Targets
 
-This module uses OpenAI's GPT models to generate in-depth research summaries
-for drug targets, focusing on cyclic peptide modality in drug development.
+This module uses OpenAI GPT or Google Gemini models to generate in-depth research 
+summaries for drug targets, focusing on cyclic peptide modality in drug development.
+
+Supported providers:
+- OpenAI: gpt-4o, gpt-4-turbo, gpt-3.5-turbo, o1, o1-mini, etc.
+- Google: gemini-1.5-pro, gemini-1.5-flash, gemini-2.0-flash-exp, etc.
 """
 
 import os
@@ -10,21 +14,47 @@ import json
 import hashlib
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from datetime import datetime
 
+# OpenAI import
 try:
     from openai import OpenAI
 except ImportError:
     OpenAI = None
+
+# Google Gemini import
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    genai = None
+    GEMINI_AVAILABLE = False
 
 
 # Default cache directory
 CACHE_DIR = Path(__file__).parent.parent / "cache" / "llm_research"
 
 # Module-level client cache to avoid re-initialization issues
-_cached_client: Optional["OpenAI"] = None
-_cached_api_key: Optional[str] = None
+_cached_openai_client: Optional["OpenAI"] = None
+_cached_openai_key: Optional[str] = None
+_cached_gemini_key: Optional[str] = None
+
+
+def get_provider(model: str) -> str:
+    """
+    Determine the provider based on model name.
+    
+    Args:
+        model: Model name string.
+    
+    Returns:
+        'openai' or 'gemini'
+    """
+    model_lower = model.lower()
+    if 'gemini' in model_lower:
+        return 'gemini'
+    return 'openai'
 
 
 def get_openai_client(api_key: Optional[str] = None) -> "OpenAI":
@@ -43,7 +73,7 @@ def get_openai_client(api_key: Optional[str] = None) -> "OpenAI":
         ImportError: If openai package is not installed.
         ValueError: If no API key is available.
     """
-    global _cached_client, _cached_api_key
+    global _cached_openai_client, _cached_openai_key
     
     if OpenAI is None:
         raise ImportError(
@@ -51,7 +81,7 @@ def get_openai_client(api_key: Optional[str] = None) -> "OpenAI":
         )
     
     # Determine the key to use
-    key = api_key or _cached_api_key or os.environ.get("OPENAI_API_KEY")
+    key = api_key or _cached_openai_key or os.environ.get("OPENAI_API_KEY")
     if not key:
         raise ValueError(
             "OpenAI API key not provided. Set OPENAI_API_KEY environment variable "
@@ -59,14 +89,47 @@ def get_openai_client(api_key: Optional[str] = None) -> "OpenAI":
         )
     
     # Return cached client if key matches
-    if _cached_client is not None and _cached_api_key == key:
-        return _cached_client
+    if _cached_openai_client is not None and _cached_openai_key == key:
+        return _cached_openai_client
     
     # Create new client and cache it
-    _cached_client = OpenAI(api_key=key)
-    _cached_api_key = key
+    _cached_openai_client = OpenAI(api_key=key)
+    _cached_openai_key = key
     
-    return _cached_client
+    return _cached_openai_client
+
+
+def configure_gemini(api_key: Optional[str] = None) -> None:
+    """
+    Configure Google Gemini with API key.
+    
+    Args:
+        api_key: Gemini API key. If not provided, uses GEMINI_API_KEY or GOOGLE_API_KEY env variable.
+    
+    Raises:
+        ImportError: If google-generativeai package is not installed.
+        ValueError: If no API key is available.
+    """
+    global _cached_gemini_key
+    
+    if not GEMINI_AVAILABLE:
+        raise ImportError(
+            "Google Generative AI package not installed. "
+            "Please install with: pip install google-generativeai"
+        )
+    
+    # Determine the key to use
+    key = api_key or _cached_gemini_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not key:
+        raise ValueError(
+            "Gemini API key not provided. Set GEMINI_API_KEY or GOOGLE_API_KEY "
+            "environment variable or pass api_key parameter."
+        )
+    
+    # Configure if key changed
+    if _cached_gemini_key != key:
+        genai.configure(api_key=key)
+        _cached_gemini_key = key
 
 
 def get_cache_path(target: str, model: str) -> Path:
@@ -201,6 +264,125 @@ Focus on actionable insights for drug development decision-making."""
     return prompt
 
 
+def _generate_with_openai(
+    prompt: str,
+    model: str,
+    api_key: Optional[str],
+    max_retries: int,
+    retry_delay: float
+) -> Tuple[Optional[str], Optional[dict], Optional[str]]:
+    """
+    Generate research using OpenAI API.
+    
+    Returns:
+        Tuple of (content, token_usage, error_message)
+    """
+    client = get_openai_client(api_key)
+    
+    # Determine API parameters based on model type
+    is_new_model = any(x in model.lower() for x in ['o1', 'o3', 'gpt-4.1', 'gpt-4.5', 'gpt-5'])
+    
+    system_prompt = (
+        "You are an expert pharmaceutical research analyst with deep knowledge "
+        "of cyclic peptide drug development, target biology, and competitive "
+        "landscape analysis. Provide detailed, actionable research insights."
+    )
+    
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            request_params = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ]
+            }
+            
+            if is_new_model:
+                request_params["max_completion_tokens"] = 4000
+            else:
+                request_params["temperature"] = 0.7
+                request_params["max_tokens"] = 4000
+            
+            response = client.chat.completions.create(**request_params)
+            
+            content = response.choices[0].message.content
+            tokens = {
+                "prompt": response.usage.prompt_tokens,
+                "completion": response.usage.completion_tokens,
+                "total": response.usage.total_tokens
+            }
+            return content, tokens, None
+            
+        except Exception as e:
+            last_error = e
+            error_details = f"{type(e).__name__}: {str(e)}"
+            print(f"  [Attempt {attempt + 1}/{max_retries}] OpenAI error: {error_details}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay * (attempt + 1))
+    
+    return None, None, f"{type(last_error).__name__}: {str(last_error)}"
+
+
+def _generate_with_gemini(
+    prompt: str,
+    model: str,
+    api_key: Optional[str],
+    max_retries: int,
+    retry_delay: float
+) -> Tuple[Optional[str], Optional[dict], Optional[str]]:
+    """
+    Generate research using Google Gemini API.
+    
+    Returns:
+        Tuple of (content, token_usage, error_message)
+    """
+    configure_gemini(api_key)
+    
+    system_prompt = (
+        "You are an expert pharmaceutical research analyst with deep knowledge "
+        "of cyclic peptide drug development, target biology, and competitive "
+        "landscape analysis. Provide detailed, actionable research insights."
+    )
+    
+    full_prompt = f"{system_prompt}\n\n{prompt}"
+    
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            gemini_model = genai.GenerativeModel(model)
+            response = gemini_model.generate_content(
+                full_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=4000,
+                    temperature=0.7,
+                )
+            )
+            
+            content = response.text
+            
+            # Gemini token usage (if available)
+            tokens = None
+            if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                tokens = {
+                    "prompt": getattr(response.usage_metadata, 'prompt_token_count', 0),
+                    "completion": getattr(response.usage_metadata, 'candidates_token_count', 0),
+                    "total": getattr(response.usage_metadata, 'total_token_count', 0)
+                }
+            
+            return content, tokens, None
+            
+        except Exception as e:
+            last_error = e
+            error_details = f"{type(e).__name__}: {str(e)}"
+            print(f"  [Attempt {attempt + 1}/{max_retries}] Gemini error: {error_details}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay * (attempt + 1))
+    
+    return None, None, f"{type(last_error).__name__}: {str(last_error)}"
+
+
 def generate_target_research(
     target: str,
     drug_count: int,
@@ -209,7 +391,7 @@ def generate_target_research(
     drugs: list,
     companies: list,
     api_key: Optional[str] = None,
-    model: str = "gpt-4o",
+    model: str = "gpt-5.2",
     use_cache: bool = True,
     cache_max_age_days: int = 30,
     max_retries: int = 3,
@@ -218,6 +400,10 @@ def generate_target_research(
     """
     Generate deep research summary for a target using LLM.
     
+    Supports both OpenAI and Google Gemini models:
+    - OpenAI: gpt-4o, gpt-4-turbo, gpt-3.5-turbo, o1, o1-mini, etc.
+    - Gemini: gemini-1.5-pro, gemini-1.5-flash, gemini-2.0-flash-exp, etc.
+    
     Args:
         target: Target name.
         drug_count: Number of drugs targeting this target.
@@ -225,8 +411,8 @@ def generate_target_research(
         therapeutic_areas: List of therapeutic areas.
         drugs: List of drug information dicts.
         companies: List of company names.
-        api_key: OpenAI API key (optional, uses env var if not provided).
-        model: OpenAI model to use (default: gpt-4o).
+        api_key: API key (uses env var if not provided - OPENAI_API_KEY or GEMINI_API_KEY).
+        model: Model to use (default: gpt-4o). Use 'gemini-' prefix for Gemini models.
         use_cache: Whether to use cached results.
         cache_max_age_days: Maximum cache age in days.
         max_retries: Maximum number of retries on API failure.
@@ -247,71 +433,47 @@ def generate_target_research(
         target, drug_count, highest_phase, therapeutic_areas, drugs, companies
     )
     
-    # Initialize client
-    client = get_openai_client(api_key)
+    # Determine provider and generate
+    provider = get_provider(model)
     
-    # Make API call with retries
-    last_error = None
-    for attempt in range(max_retries):
-        try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an expert pharmaceutical research analyst with deep knowledge "
-                            "of cyclic peptide drug development, target biology, and competitive "
-                            "landscape analysis. Provide detailed, actionable research insights."
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=4000
-            )
-            
-            research_content = response.choices[0].message.content
-            
-            result = {
-                "target": target,
-                "research_summary": research_content,
-                "model": model,
-                "generated_at": datetime.now().isoformat(),
-                "drug_count": drug_count,
-                "highest_phase": highest_phase,
-                "from_cache": False,
-                "tokens_used": {
-                    "prompt": response.usage.prompt_tokens,
-                    "completion": response.usage.completion_tokens,
-                    "total": response.usage.total_tokens
-                }
-            }
-            
-            # Cache the result
-            if use_cache:
-                save_research_cache(target, model, result)
-            
-            return result
-            
-        except Exception as e:
-            last_error = e
-            if attempt < max_retries - 1:
-                time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
-            continue
+    if provider == 'gemini':
+        content, tokens, error = _generate_with_gemini(
+            prompt, model, api_key, max_retries, retry_delay
+        )
+    else:
+        content, tokens, error = _generate_with_openai(
+            prompt, model, api_key, max_retries, retry_delay
+        )
     
-    # Return error result if all retries failed
-    return {
-        "target": target,
-        "research_summary": None,
-        "error": str(last_error),
-        "model": model,
-        "generated_at": datetime.now().isoformat(),
-        "from_cache": False
-    }
+    # Build result
+    if content:
+        result = {
+            "target": target,
+            "research_summary": content,
+            "model": model,
+            "provider": provider,
+            "generated_at": datetime.now().isoformat(),
+            "drug_count": drug_count,
+            "highest_phase": highest_phase,
+            "from_cache": False,
+            "tokens_used": tokens
+        }
+        
+        # Cache the result
+        if use_cache:
+            save_research_cache(target, model, result)
+        
+        return result
+    else:
+        return {
+            "target": target,
+            "research_summary": None,
+            "error": error or "Unknown error",
+            "model": model,
+            "provider": provider,
+            "generated_at": datetime.now().isoformat(),
+            "from_cache": False
+        }
 
 
 def format_research_for_html(research: dict) -> str:
@@ -325,11 +487,19 @@ def format_research_for_html(research: dict) -> str:
         HTML-formatted string.
     """
     if not research or not research.get("research_summary"):
+        # error_msg = research.get("error", "Research generation failed") if research else "No research available"
+        # return f"""
+        # <div class="research-error">
+        #     <p><em>AI-powered research summary not available: {error_msg}</em></p>
+        #     <p>Please ensure the OpenAI API key is configured correctly.</p>
+        # </div>
+        # """
         error_msg = research.get("error", "Research generation failed") if research else "No research available"
         return f"""
         <div class="research-error">
-            <p><em>AI-powered research summary not available: {error_msg}</em></p>
-            <p>Please ensure the OpenAI API key is configured correctly.</p>
+        <p><em>AI-powered research summary not available: {error_msg}</em></p>
+        <p>Model: {research.get('model') if research else 'Unknown'}</p>
+        <p>Provider: {research.get('provider') if research else 'Unknown'}</p>
         </div>
         """
     
@@ -404,7 +574,7 @@ def batch_generate_research(
     targets: list,
     target_data: dict,
     api_key: Optional[str] = None,
-    model: str = "gpt-4o",
+    model: str = "gpt-5.2",
     use_cache: bool = True,
     progress_callback=None,
     delay_between_calls: float = 1.0

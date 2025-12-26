@@ -336,7 +336,7 @@
     <div class="header">
         <h1>{{ target_name }}</h1>
         <p class="subtitle">Cyclic Peptide Drug Target Analysis</p>
-        <a href="../index.html" class="nav-link">Back to Overview</a>
+        <a href="{{ back_link | default('../index.html') }}" class="nav-link">Back to Overview</a>
     </div>
 
     <div class="container">

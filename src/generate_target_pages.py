@@ -613,19 +613,29 @@ def generate_all_target_pages(
             print("Please ensure openai package is installed: pip install openai")
             enable_llm_research = False
         else:
+            # Determine provider based on model name
+            is_gemini = 'gemini' in llm_model.lower()
+            
             # Validate API key is available before starting
-            effective_api_key = llm_api_key or os.environ.get("OPENAI_API_KEY")
+            if is_gemini:
+                effective_api_key = llm_api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+                key_env_var = "GEMINI_API_KEY or GOOGLE_API_KEY"
+            else:
+                effective_api_key = llm_api_key or os.environ.get("OPENAI_API_KEY")
+                key_env_var = "OPENAI_API_KEY"
+            
             if not effective_api_key:
-                print("Warning: LLM research requested but no API key found.")
+                print(f"Warning: LLM research requested but no API key found for {'Gemini' if is_gemini else 'OpenAI'}.")
                 print("Please either:")
-                print("  - Set OPENAI_API_KEY environment variable, or")
+                print(f"  - Set {key_env_var} environment variable, or")
                 print("  - Pass --llm-api-key parameter")
                 print("Continuing without LLM research...")
                 enable_llm_research = False
             else:
                 # Store the key for the session
                 llm_api_key = effective_api_key
-                print(f"LLM research enabled using model: {llm_model}")
+                provider = "Gemini" if is_gemini else "OpenAI"
+                print(f"LLM research enabled using {provider} model: {llm_model}")
                 if use_cache:
                     print("Cache enabled - previously generated research will be reused")
 
@@ -751,7 +761,7 @@ if __name__ == "__main__":
         "--llm-model",
         type=str,
         default="gpt-4o",
-        help="OpenAI model to use (default: gpt-4o)"
+        help="LLM model to use. OpenAI: gpt-4o, o1, o1-mini. Gemini: gemini-1.5-pro, gemini-1.5-flash"
     )
     parser.add_argument(
         "--no-cache",
