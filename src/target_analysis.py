@@ -450,7 +450,7 @@ def create_company_analysis_plot(analysis_results: dict, output_dir: str, top_n:
 
 
 def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table: pd.DataFrame, output_dir: str):
-    """Generate an HTML summary report."""
+    """Generate an HTML summary report with McKinsey-style professional design."""
     summary = analysis_results['target_summary']
 
     # Get filtered targets for Immunology and Endocrinology & Metabolism
@@ -466,197 +466,306 @@ def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cyclic Peptide Drug Target Analysis</title>
     <style>
+        :root {
+            --navy-primary: #002B5C;
+            --navy-dark: #001a3a;
+            --navy-light: #003d82;
+            --accent-gold: #C4A962;
+            --accent-teal: #007589;
+            --text-primary: #1a1a1a;
+            --text-secondary: #5a5a5a;
+            --bg-light: #f7f8fa;
+            --bg-white: #ffffff;
+            --border-light: #e5e7eb;
+            --success: #0d7377;
+        }
         * {
             box-sizing: border-box;
-        }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f5f5f5;
+        }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background-color: var(--bg-light);
         }
         .page-wrapper {
             display: flex;
             min-height: 100vh;
         }
-        /* Navigation Sidebar */
+        /* Navigation Sidebar - McKinsey Style */
         .nav-sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%);
+            width: 260px;
+            background-color: var(--navy-primary);
             color: white;
             position: fixed;
             top: 0;
             left: 0;
             height: 100vh;
             overflow-y: auto;
-            padding: 20px 0;
+            padding: 0;
             z-index: 1000;
         }
-        .nav-sidebar h3 {
-            padding: 0 20px;
-            margin: 0 0 20px 0;
-            font-size: 1.1em;
-            color: #ecf0f1;
-            border-bottom: 1px solid #34495e;
-            padding-bottom: 15px;
+        .nav-header {
+            padding: 24px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
-        .nav-section {
-            margin-bottom: 25px;
+        .nav-header h3 {
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin: 0;
+            color: white;
         }
-        .nav-section-title {
-            padding: 8px 20px;
-            font-size: 0.75em;
+        .nav-header .subtitle {
+            font-size: 11px;
+            color: rgba(255,255,255,0.6);
+            margin-top: 4px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: #95a5a6;
+        }
+        .nav-section {
+            padding: 16px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .nav-section:last-child {
+            border-bottom: none;
+        }
+        .nav-section-title {
+            padding: 0 20px 8px 20px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: rgba(255,255,255,0.5);
             font-weight: 600;
         }
         .nav-link {
             display: block;
             padding: 10px 20px;
-            color: #bdc3c7;
+            color: rgba(255,255,255,0.85);
             text-decoration: none;
-            font-size: 0.9em;
-            transition: all 0.2s ease;
+            font-size: 13px;
+            transition: all 0.15s ease;
             border-left: 3px solid transparent;
         }
         .nav-link:hover {
-            background-color: rgba(255,255,255,0.1);
+            background-color: rgba(255,255,255,0.08);
             color: white;
-            border-left-color: #3498db;
+            border-left-color: var(--accent-gold);
         }
         .nav-link.highlight {
-            background-color: rgba(46, 204, 113, 0.2);
-            border-left-color: #2ecc71;
+            background-color: rgba(0, 117, 137, 0.3);
+            border-left-color: var(--accent-teal);
+            color: white;
         }
         .nav-link.highlight:hover {
-            background-color: rgba(46, 204, 113, 0.3);
+            background-color: rgba(0, 117, 137, 0.4);
         }
         /* Main Content */
         .main-content {
-            margin-left: 280px;
+            margin-left: 260px;
             flex: 1;
-            padding: 30px;
+            padding: 40px 48px;
+            background-color: var(--bg-light);
         }
         .container {
-            max-width: 1200px;
+            max-width: 1100px;
             margin: 0 auto;
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        h1 {
-            color: #2c3e50;
-            border-bottom: 3px solid #3498db;
-            padding-bottom: 10px;
+        /* Header */
+        .page-header {
+            margin-bottom: 40px;
+            padding-bottom: 24px;
+            border-bottom: 2px solid var(--navy-primary);
         }
-        h2 {
-            color: #34495e;
-            margin-top: 30px;
-            padding-top: 20px;
+        .page-header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--navy-primary);
+            margin: 0 0 8px 0;
+            letter-spacing: -0.5px;
         }
+        .page-header .date {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        /* Section Headers */
         .section {
             scroll-margin-top: 20px;
+            margin-bottom: 48px;
+        }
+        .section h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--navy-primary);
+            margin: 0 0 20px 0;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
         .section-badge {
             display: inline-block;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 0.7em;
+            padding: 3px 10px;
+            font-size: 10px;
             font-weight: 600;
-            margin-left: 10px;
-            vertical-align: middle;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-radius: 2px;
         }
         .badge-all {
-            background-color: #3498db;
+            background-color: var(--navy-primary);
             color: white;
         }
         .badge-filtered {
-            background-color: #2ecc71;
+            background-color: var(--accent-teal);
             color: white;
         }
+        /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 20px;
-            margin: 20px 0;
+            margin-bottom: 40px;
         }
         .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
+            background-color: var(--bg-white);
+            border: 1px solid var(--border-light);
+            padding: 24px;
+            text-align: left;
         }
-        .stat-value {
-            font-size: 2.5em;
-            font-weight: bold;
+        .stat-card .stat-value {
+            font-size: 36px;
+            font-weight: 600;
+            color: var(--navy-primary);
+            line-height: 1.1;
+            margin-bottom: 8px;
         }
-        .stat-label {
-            font-size: 0.9em;
-            opacity: 0.9;
+        .stat-card .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-card.highlight {
+            border-left: 4px solid var(--accent-gold);
+        }
+        /* Tables */
+        .table-container {
+            background-color: var(--bg-white);
+            border: 1px solid var(--border-light);
+            overflow: hidden;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
-            font-size: 0.9em;
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
+            font-size: 13px;
         }
         th {
-            background-color: #3498db;
+            background-color: var(--navy-primary);
             color: white;
+            font-weight: 600;
+            text-align: left;
+            padding: 14px 16px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-light);
+            color: var(--text-primary);
+        }
+        tr:last-child td {
+            border-bottom: none;
         }
         tr:hover {
-            background-color: #f5f5f5;
+            background-color: #f8f9fb;
         }
+        .target-link {
+            color: var(--navy-light);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .target-link:hover {
+            color: var(--navy-primary);
+            text-decoration: underline;
+        }
+        /* Plot Container */
         .plot-container {
-            margin: 30px 0;
+            background-color: var(--bg-white);
+            border: 1px solid var(--border-light);
+            padding: 24px;
             text-align: center;
         }
         .plot-container img {
             max-width: 100%;
             height: auto;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         .interactive-link {
             display: inline-block;
-            margin: 10px 0;
-            padding: 10px 20px;
-            background-color: #3498db;
+            margin-top: 16px;
+            padding: 10px 24px;
+            background-color: var(--navy-primary);
             color: white;
             text-decoration: none;
-            border-radius: 5px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: background-color 0.15s ease;
         }
         .interactive-link:hover {
-            background-color: #2980b9;
+            background-color: var(--navy-dark);
         }
-        .target-link {
-            color: #3498db;
-            text-decoration: none;
-        }
-        .target-link:hover {
-            text-decoration: underline;
-        }
+        /* Filtered Section */
         .filtered-section {
-            background: linear-gradient(135deg, #f8fff8 0%, #e8f5e9 100%);
-            border: 2px solid #2ecc71;
-            border-radius: 10px;
-            padding: 25px;
-            margin-top: 40px;
+            background-color: var(--bg-white);
+            border: 1px solid var(--border-light);
+            border-left: 4px solid var(--accent-teal);
+            padding: 32px;
+            margin-top: 48px;
         }
         .filtered-section h2 {
-            color: #27ae60;
-            margin-top: 0;
-            padding-top: 0;
+            color: var(--accent-teal);
+            border-bottom-color: var(--accent-teal);
+        }
+        .filtered-section p {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .filtered-section .table-container {
+            border-left: none;
+        }
+        /* Footer note */
+        .table-note {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 12px;
+            font-style: italic;
+        }
+        /* Pivot table styling */
+        .pivot-table {
+            font-size: 12px;
+        }
+        .pivot-table th {
+            padding: 10px 12px;
+        }
+        .pivot-table td {
+            padding: 8px 12px;
         }
         /* Responsive */
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
         @media (max-width: 900px) {
             .nav-sidebar {
                 width: 100%;
@@ -665,9 +774,13 @@ def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table:
             }
             .main-content {
                 margin-left: 0;
+                padding: 24px;
             }
             .page-wrapper {
                 flex-direction: column;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -676,7 +789,10 @@ def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table:
     <div class="page-wrapper">
         <!-- Navigation Sidebar -->
         <nav class="nav-sidebar">
-            <h3>Cyclic Peptide Analysis</h3>
+            <div class="nav-header">
+                <h3>Cyclic Peptide Analysis</h3>
+                <div class="subtitle">Drug Target Report</div>
+            </div>
 
             <div class="nav-section">
                 <div class="nav-section-title">Overview</div>
@@ -694,7 +810,7 @@ def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table:
             </div>
 
             <div class="nav-section">
-                <div class="nav-section-title">Filtered by Therapeutic Area</div>
+                <div class="nav-section-title">Filtered Analysis</div>
                 <a href="#immunology-endocrinology" class="nav-link highlight">Immunology & Endocrinology</a>
             </div>
         </nav>
@@ -702,26 +818,30 @@ def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table:
         <!-- Main Content -->
         <main class="main-content">
             <div class="container">
-                <h1>Cyclic Peptide Drug Target Analysis</h1>
+                <!-- Header -->
+                <header class="page-header">
+                    <h1>Cyclic Peptide Drug Target Analysis</h1>
+                    <div class="date">Comprehensive Pipeline Overview</div>
+                </header>
 
                 <!-- Overview Section -->
                 <section id="overview" class="section">
                     <div class="stats-grid">
-                        <div class="stat-card">
+                        <div class="stat-card highlight">
                             <div class="stat-value">""" + str(len(summary)) + """</div>
                             <div class="stat-label">Unique Targets</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-value">""" + str(summary['total_drugs'].sum()) + """</div>
-                            <div class="stat-label">Total Drug-Target Pairs</div>
+                            <div class="stat-label">Drug-Target Pairs</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-value">""" + str(len(summary[summary['highest_phase'].isin(['phase 3', 'pre-registration', 'approved', 'launched'])])) + """</div>
-                            <div class="stat-label">Targets with Late-Stage Drugs</div>
+                            <div class="stat-label">Late-Stage Targets</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-value">""" + str(sum(summary['company_count'])) + """</div>
-                            <div class="stat-label">Total Company Involvements</div>
+                            <div class="stat-label">Company Involvements</div>
                         </div>
                     </div>
                 </section>
@@ -769,17 +889,18 @@ def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table:
                 <!-- Target Summary Table -->
                 <section id="target-summary" class="section">
                     <h2>Target Summary Table <span class="section-badge badge-all">All Disease Areas</span></h2>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Target</th>
-                                <th>Total Drugs</th>
-                                <th>Highest Phase</th>
-                                <th>Companies</th>
-                                <th>Therapeutic Areas</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Target</th>
+                                    <th>Total Drugs</th>
+                                    <th>Highest Phase</th>
+                                    <th>Companies</th>
+                                    <th>Therapeutic Areas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
 """
 
     for _, row in summary.head(50).iterrows():
@@ -796,15 +917,18 @@ def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table:
 """
 
     html_content += """
-                        </tbody>
-                    </table>
-                    <p><em>Click on target names to view detailed analysis pages.</em></p>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="table-note">Click on target names to view detailed analysis pages.</p>
                 </section>
 
                 <!-- Pivot Table -->
                 <section id="pivot-table" class="section">
                     <h2>Pivot Table: Targets by Phase <span class="section-badge badge-all">All Disease Areas</span></h2>
+                    <div class="table-container">
                     """ + pivot_table.head(30).to_html(index=False, classes='pivot-table') + """
+                    </div>
                 </section>
 
 """
@@ -816,34 +940,36 @@ def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table:
                 <section id="immunology-endocrinology" class="section filtered-section">
                     <h2>Targets with Immunology or Endocrinology & Metabolism Indications <span class="section-badge badge-filtered">Filtered</span></h2>
                     <p>The following targets have drugs with indications in <strong>Immunology</strong> or <strong>Endocrinology & Metabolism</strong> therapeutic areas.</p>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Target</th>
-                                <th>Drug Count</th>
-                                <th>Highest Phase</th>
-                                <th>Therapeutic Areas</th>
-                                <th>Key Indications</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Target</th>
+                                    <th>Drug Count</th>
+                                    <th>Highest Phase</th>
+                                    <th>Therapeutic Areas</th>
+                                    <th>Key Indications</th>
+                                </tr>
+                            </thead>
+                            <tbody>
 """
         for _, row in filtered_targets.iterrows():
             target_filename = row['target'].replace('/', '_').replace(' ', '_').replace('α', 'alpha').replace('β', 'beta')
             target_filename = ''.join(c for c in target_filename if c.isalnum() or c in '_-')
             html_content += f"""
-                            <tr>
-                                <td><a href="target_pages/{target_filename}.html" class="target-link">{row['target']}</a></td>
-                                <td>{row['drug_count']}</td>
-                                <td>{row['highest_phase_display']}</td>
-                                <td>{', '.join(row['therapeutic_areas'])}</td>
-                                <td>{', '.join(row['indications'][:3])}</td>
-                            </tr>
+                                <tr>
+                                    <td><a href="target_pages/{target_filename}.html" class="target-link">{row['target']}</a></td>
+                                    <td>{row['drug_count']}</td>
+                                    <td>{row['highest_phase_display']}</td>
+                                    <td>{', '.join(row['therapeutic_areas'])}</td>
+                                    <td>{', '.join(row['indications'][:3])}</td>
+                                </tr>
 """
         html_content += """
-                        </tbody>
-                    </table>
-                    <p><em>This table shows """ + str(len(filtered_targets)) + """ targets with indications in Immunology or Endocrinology & Metabolism.</em></p>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="table-note">This table shows """ + str(len(filtered_targets)) + """ targets with indications in Immunology or Endocrinology & Metabolism.</p>
                 </section>
 """
 
