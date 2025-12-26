@@ -158,6 +158,80 @@ def analyze_targets(df: pd.DataFrame) -> dict:
     return results
 
 
+def get_targets_by_indication_therapeutic_area(df: pd.DataFrame, therapeutic_areas: list) -> pd.DataFrame:
+    """
+    Get targets that have indications in specified therapeutic areas.
+
+    Args:
+        df: DataFrame with drug data
+        therapeutic_areas: List of therapeutic area names to filter by (e.g., ["Immunology", "Endocrinology & Metabolism"])
+
+    Returns:
+        DataFrame with target information for matching drugs
+    """
+    matching_targets = {}
+
+    for _, row in df.iterrows():
+        targets = str(row['targets']).split(';') if pd.notna(row['targets']) else []
+        indications = parse_indications_json(row.get('indications_json', ''))
+
+        # Check if any indication has a matching therapeutic area
+        matching_indications = []
+        for ind in indications:
+            ta = ind.get('therapeutic_area_en', '')
+            if ta in therapeutic_areas:
+                matching_indications.append({
+                    'indication': ind.get('indication_en', 'Unknown'),
+                    'therapeutic_area': ta,
+                    'phase': ind.get('highest_phase', 'pre-clinical')
+                })
+
+        if matching_indications:
+            for target in targets:
+                target = target.strip()
+                if target:
+                    if target not in matching_targets:
+                        matching_targets[target] = {
+                            'target': target,
+                            'drugs': [],
+                            'indications': [],
+                            'therapeutic_areas': set(),
+                            'highest_phase': 'pre-clinical',
+                            'highest_phase_val': -1
+                        }
+
+                    matching_targets[target]['drugs'].append(row['drug_name_en'])
+                    matching_targets[target]['indications'].extend(matching_indications)
+
+                    for ind in matching_indications:
+                        matching_targets[target]['therapeutic_areas'].add(ind['therapeutic_area'])
+                        phase_val = PHASE_ORDER.get(ind['phase'], -1)
+                        if phase_val > matching_targets[target]['highest_phase_val']:
+                            matching_targets[target]['highest_phase_val'] = phase_val
+                            matching_targets[target]['highest_phase'] = ind['phase']
+
+    # Convert to list and prepare for DataFrame
+    result_data = []
+    for target, data in matching_targets.items():
+        # Get unique indications
+        unique_indications = list(set([ind['indication'] for ind in data['indications']]))
+        result_data.append({
+            'target': data['target'],
+            'drug_count': len(set(data['drugs'])),
+            'drugs': list(set(data['drugs'])),
+            'indications': unique_indications[:5],  # Top 5 indications
+            'therapeutic_areas': list(data['therapeutic_areas']),
+            'highest_phase': data['highest_phase'],
+            'highest_phase_display': PHASE_DISPLAY_NAMES.get(data['highest_phase'], data['highest_phase'])
+        })
+
+    result_df = pd.DataFrame(result_data)
+    if not result_df.empty:
+        result_df = result_df.sort_values('drug_count', ascending=False)
+
+    return result_df
+
+
 def create_pivot_table(df: pd.DataFrame, analysis_results: dict) -> pd.DataFrame:
     """Create a pivot table of targets by phase."""
     summary = analysis_results['target_summary']
@@ -375,9 +449,14 @@ def create_company_analysis_plot(analysis_results: dict, output_dir: str, top_n:
     fig.write_html(os.path.join(output_dir, 'top_companies.html'))
 
 
-def generate_summary_html(analysis_results: dict, pivot_table: pd.DataFrame, output_dir: str):
+def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table: pd.DataFrame, output_dir: str):
     """Generate an HTML summary report."""
     summary = analysis_results['target_summary']
+
+    # Get filtered targets for Immunology and Endocrinology & Metabolism
+    filtered_targets = get_targets_by_indication_therapeutic_area(
+        df, ['Immunology', 'Endocrinology & Metabolism']
+    )
 
     html_content = """
 <!DOCTYPE html>
@@ -503,6 +582,44 @@ def generate_summary_html(analysis_results: dict, pivot_table: pd.DataFrame, out
             </div>
         </div>
 
+"""
+
+    # Add filtered targets section for Immunology and Endocrinology & Metabolism
+    if not filtered_targets.empty:
+        html_content += """
+        <h2>Targets with Immunology or Endocrinology & Metabolism Indications</h2>
+        <p>The following targets have drugs with indications in Immunology or Endocrinology & Metabolism therapeutic areas.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Target</th>
+                    <th>Drug Count</th>
+                    <th>Highest Phase</th>
+                    <th>Therapeutic Areas</th>
+                    <th>Key Indications</th>
+                </tr>
+            </thead>
+            <tbody>
+"""
+        for _, row in filtered_targets.iterrows():
+            target_filename = row['target'].replace('/', '_').replace(' ', '_').replace('α', 'alpha').replace('β', 'beta')
+            target_filename = ''.join(c for c in target_filename if c.isalnum() or c in '_-')
+            html_content += f"""
+                <tr>
+                    <td><a href="target_pages/{target_filename}.html" class="target-link">{row['target']}</a></td>
+                    <td>{row['drug_count']}</td>
+                    <td>{row['highest_phase_display']}</td>
+                    <td>{', '.join(row['therapeutic_areas'])}</td>
+                    <td>{', '.join(row['indications'][:3])}</td>
+                </tr>
+"""
+        html_content += """
+            </tbody>
+        </table>
+        <p><em>This table shows """ + str(len(filtered_targets)) + """ targets with indications in Immunology or Endocrinology & Metabolism.</em></p>
+"""
+
+    html_content += """
         <h2>Development Phase Distribution</h2>
         <div class="plot-container">
             <img src="plots/phase_distribution.png" alt="Phase Distribution">
@@ -600,7 +717,7 @@ def run_analysis(data_path: str, output_dir: str):
     create_company_analysis_plot(analysis_results, plots_dir)
 
     print("Generating summary HTML...")
-    generate_summary_html(analysis_results, pivot_table, output_dir)
+    generate_summary_html(df, analysis_results, pivot_table, output_dir)
 
     # Save pivot table as CSV
     pivot_table.to_csv(os.path.join(output_dir, 'target_pivot_table.csv'), index=False)
