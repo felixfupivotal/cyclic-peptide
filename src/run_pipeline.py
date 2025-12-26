@@ -5,9 +5,17 @@ Cyclic Peptide Drug Analysis Pipeline
 This is the main entry point for running the complete analysis workflow:
 1. Target analysis with summary tables and plots
 2. Individual target page generation
+3. AI-powered deep research summaries (optional)
 
 Usage:
     python run_pipeline.py [--data-path PATH] [--output-dir PATH] [--min-drugs N]
+    
+    # With LLM research enabled:
+    python run_pipeline.py --llm-research --llm-api-key YOUR_API_KEY
+    
+    # Or set environment variable:
+    export OPENAI_API_KEY=your-key-here
+    python run_pipeline.py --llm-research
 """
 
 import argparse
@@ -56,6 +64,29 @@ def main():
         action='store_true',
         help='Skip individual target page generation'
     )
+    # LLM Research Options
+    parser.add_argument(
+        '--llm-research',
+        action='store_true',
+        help='Enable AI-powered deep research using OpenAI GPT models'
+    )
+    parser.add_argument(
+        '--llm-api-key',
+        type=str,
+        default=None,
+        help='OpenAI API key (or set OPENAI_API_KEY environment variable)'
+    )
+    parser.add_argument(
+        '--llm-model',
+        type=str,
+        default='gpt-4o',
+        help='OpenAI model to use (default: gpt-4o, options: gpt-4o, gpt-4-turbo, gpt-3.5-turbo)'
+    )
+    parser.add_argument(
+        '--no-cache',
+        action='store_true',
+        help='Disable caching of LLM research results (regenerate all)'
+    )
 
     args = parser.parse_args()
 
@@ -71,6 +102,10 @@ def main():
     print(f"\nStart time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Data file: {data_path}")
     print(f"Output directory: {output_dir}")
+    if args.llm_research:
+        print(f"LLM Research: Enabled (model: {args.llm_model})")
+        if args.no_cache:
+            print("LLM Cache: Disabled")
     print()
 
     # Step 1: Run target analysis
@@ -91,11 +126,20 @@ def main():
         print()
         print("-" * 60)
         print("STEP 2: Target Page Generation")
+        if args.llm_research:
+            print("         (with AI-powered research summaries)")
         print("-" * 60)
 
         target_pages_dir = os.path.join(output_dir, "target_pages")
         generated_pages = run_page_generation(
-            data_path, template_dir, target_pages_dir, min_drugs=args.min_drugs
+            data_path=data_path,
+            template_dir=template_dir,
+            output_dir=target_pages_dir,
+            min_drugs=args.min_drugs,
+            enable_llm_research=args.llm_research,
+            llm_api_key=args.llm_api_key,
+            llm_model=args.llm_model,
+            use_cache=not args.no_cache
         )
     else:
         print("\nSkipping target page generation...")
@@ -113,6 +157,11 @@ def main():
     if not args.skip_pages:
         print(f"  - Target pages: {output_dir}/target_pages/")
         print(f"  - Total pages generated: {len(generated_pages)}")
+        if args.llm_research:
+            cache_dir = Path(output_dir).parent / "cache" / "llm_research"
+            print(f"  - LLM research cache: {cache_dir}/")
+            print(f"\nAI-powered research summaries were generated for each target.")
+            print("Note: Cached results will be reused for 30 days unless --no-cache is specified.")
 
 
 if __name__ == "__main__":

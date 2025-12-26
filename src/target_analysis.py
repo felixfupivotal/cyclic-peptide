@@ -7,6 +7,7 @@ creating summary tables and visualizations grouped by development phase.
 
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import seaborn as sns
 import plotly.express as px
 import plotly.graph_objects as go
@@ -15,6 +16,21 @@ import json
 import os
 from pathlib import Path
 from collections import Counter
+import warnings
+
+# Configure matplotlib to support CJK (Chinese) characters
+# Try different fonts in order of preference
+CJK_FONTS = ['Microsoft YaHei', 'SimHei', 'STHeiti', 'Arial Unicode MS', 'Noto Sans CJK SC']
+for font in CJK_FONTS:
+    try:
+        mpl.rcParams['font.sans-serif'] = [font] + mpl.rcParams['font.sans-serif']
+        break
+    except:
+        continue
+
+# Suppress font warnings for missing glyphs
+warnings.filterwarnings('ignore', message='Glyph .* missing from')
+mpl.rcParams['axes.unicode_minus'] = False  # Fix minus sign display
 
 
 # Define phase order for sorting

@@ -2,7 +2,8 @@
 Target Page Generator for Cyclic Peptide Drugs
 
 This module generates individual HTML pages for each drug target,
-including target biology, competitive landscape, and drug pipeline information.
+including target biology, competitive landscape, drug pipeline information,
+and AI-powered deep research summaries using LLM.
 """
 
 import pandas as pd
@@ -13,6 +14,18 @@ from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from collections import Counter
 import ast
+from typing import Optional
+
+# Import LLM research module
+try:
+    from llm_research import (
+        generate_target_research,
+        format_research_for_html,
+        batch_generate_research
+    )
+    LLM_AVAILABLE = True
+except ImportError:
+    LLM_AVAILABLE = False
 
 
 # Phase display names and CSS classes
@@ -452,8 +465,29 @@ def prepare_indication_list(drugs_df: pd.DataFrame) -> list:
     return indications[:20]  # Top 20 indications
 
 
-def generate_target_page(target: str, drugs_df: pd.DataFrame, template, output_dir: str):
-    """Generate an HTML page for a specific target."""
+def generate_target_page(
+    target: str,
+    drugs_df: pd.DataFrame,
+    template,
+    output_dir: str,
+    enable_llm_research: bool = False,
+    llm_api_key: Optional[str] = None,
+    llm_model: str = "gpt-4o",
+    use_cache: bool = True
+):
+    """
+    Generate an HTML page for a specific target.
+    
+    Args:
+        target: Target name.
+        drugs_df: DataFrame of drugs targeting this target.
+        template: Jinja2 template object.
+        output_dir: Output directory for HTML files.
+        enable_llm_research: Whether to generate LLM research summary.
+        llm_api_key: OpenAI API key for LLM research.
+        llm_model: OpenAI model to use (default: gpt-4o).
+        use_cache: Whether to use cached LLM results.
+    """
     # Calculate statistics
     total_drugs = len(drugs_df)
 
@@ -479,6 +513,27 @@ def generate_target_page(target: str, drugs_df: pd.DataFrame, template, output_d
     drugs = prepare_drug_list(drugs_df)
     companies = prepare_company_list(drugs_df)
     indications = prepare_indication_list(drugs_df)
+    
+    # Generate LLM research if enabled
+    llm_research_html = None
+    if enable_llm_research and LLM_AVAILABLE:
+        try:
+            company_names = [c['name'] for c in companies]
+            research_result = generate_target_research(
+                target=target,
+                drug_count=total_drugs,
+                highest_phase=highest_phase_display,
+                therapeutic_areas=therapeutic_areas,
+                drugs=drugs,
+                companies=company_names,
+                api_key=llm_api_key,
+                model=llm_model,
+                use_cache=use_cache
+            )
+            llm_research_html = format_research_for_html(research_result)
+        except Exception as e:
+            print(f"Warning: LLM research generation failed for {target}: {e}")
+            llm_research_html = None
 
     template_data = {
         'target_name': target,
@@ -494,6 +549,7 @@ def generate_target_page(target: str, drugs_df: pd.DataFrame, template, output_d
         'drugs': drugs,
         'companies': companies,
         'indications': indications,
+        'llm_research': llm_research_html,
         'generation_date': datetime.now().strftime('%Y-%m-%d')
     }
 
@@ -511,8 +567,29 @@ def generate_target_page(target: str, drugs_df: pd.DataFrame, template, output_d
     return output_path
 
 
-def generate_all_target_pages(df: pd.DataFrame, template_dir: str, output_dir: str, min_drugs: int = 1):
-    """Generate HTML pages for all targets."""
+def generate_all_target_pages(
+    df: pd.DataFrame,
+    template_dir: str,
+    output_dir: str,
+    min_drugs: int = 1,
+    enable_llm_research: bool = False,
+    llm_api_key: Optional[str] = None,
+    llm_model: str = "gpt-4o",
+    use_cache: bool = True
+):
+    """
+    Generate HTML pages for all targets.
+    
+    Args:
+        df: DataFrame with drug data.
+        template_dir: Directory containing Jinja2 templates.
+        output_dir: Output directory for HTML files.
+        min_drugs: Minimum number of drugs required to generate a page.
+        enable_llm_research: Whether to generate LLM research summaries.
+        llm_api_key: OpenAI API key for LLM research.
+        llm_model: OpenAI model to use.
+        use_cache: Whether to use cached LLM results.
+    """
     # Set up Jinja2 environment
     env = Environment(loader=FileSystemLoader(template_dir))
     template = env.get_template('target_page.html')
@@ -529,6 +606,28 @@ def generate_all_target_pages(df: pd.DataFrame, template_dir: str, output_dir: s
                 all_targets.add(target)
 
     print(f"Found {len(all_targets)} unique targets")
+    
+    if enable_llm_research:
+        if not LLM_AVAILABLE:
+            print("Warning: LLM research requested but llm_research module not available.")
+            print("Please ensure openai package is installed: pip install openai")
+            enable_llm_research = False
+        else:
+            # Validate API key is available before starting
+            effective_api_key = llm_api_key or os.environ.get("OPENAI_API_KEY")
+            if not effective_api_key:
+                print("Warning: LLM research requested but no API key found.")
+                print("Please either:")
+                print("  - Set OPENAI_API_KEY environment variable, or")
+                print("  - Pass --llm-api-key parameter")
+                print("Continuing without LLM research...")
+                enable_llm_research = False
+            else:
+                # Store the key for the session
+                llm_api_key = effective_api_key
+                print(f"LLM research enabled using model: {llm_model}")
+                if use_cache:
+                    print("Cache enabled - previously generated research will be reused")
 
     generated_pages = []
     for i, target in enumerate(sorted(all_targets)):
@@ -536,9 +635,21 @@ def generate_all_target_pages(df: pd.DataFrame, template_dir: str, output_dir: s
 
         if len(target_drugs) >= min_drugs:
             try:
-                output_path = generate_target_page(target, target_drugs, template, output_dir)
+                output_path = generate_target_page(
+                    target=target,
+                    drugs_df=target_drugs,
+                    template=template,
+                    output_dir=output_dir,
+                    enable_llm_research=enable_llm_research,
+                    llm_api_key=llm_api_key,
+                    llm_model=llm_model,
+                    use_cache=use_cache
+                )
                 generated_pages.append((target, output_path))
-                print(f"[{i+1}/{len(all_targets)}] Generated page for {target} ({len(target_drugs)} drugs)")
+                cache_status = ""
+                if enable_llm_research:
+                    cache_status = " [LLM]"
+                print(f"[{i+1}/{len(all_targets)}] Generated page for {target} ({len(target_drugs)} drugs){cache_status}")
             except Exception as e:
                 print(f"Error generating page for {target}: {e}")
 
@@ -546,24 +657,117 @@ def generate_all_target_pages(df: pd.DataFrame, template_dir: str, output_dir: s
     return generated_pages
 
 
-def run_page_generation(data_path: str, template_dir: str, output_dir: str, min_drugs: int = 1):
-    """Run the complete page generation workflow."""
+def run_page_generation(
+    data_path: str,
+    template_dir: str,
+    output_dir: str,
+    min_drugs: int = 1,
+    enable_llm_research: bool = False,
+    llm_api_key: Optional[str] = None,
+    llm_model: str = "gpt-4o",
+    use_cache: bool = True
+):
+    """
+    Run the complete page generation workflow.
+    
+    Args:
+        data_path: Path to the drug data CSV file.
+        template_dir: Directory containing Jinja2 templates.
+        output_dir: Output directory for HTML files.
+        min_drugs: Minimum number of drugs required to generate a page.
+        enable_llm_research: Whether to generate LLM research summaries.
+        llm_api_key: OpenAI API key for LLM research.
+        llm_model: OpenAI model to use (e.g., 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo').
+        use_cache: Whether to use cached LLM results.
+    """
     print("Loading data...")
     df = load_data(data_path)
     print(f"Loaded {len(df)} drugs")
 
     print("\nGenerating target pages...")
-    generated = generate_all_target_pages(df, template_dir, output_dir, min_drugs)
+    generated = generate_all_target_pages(
+        df=df,
+        template_dir=template_dir,
+        output_dir=output_dir,
+        min_drugs=min_drugs,
+        enable_llm_research=enable_llm_research,
+        llm_api_key=llm_api_key,
+        llm_model=llm_model,
+        use_cache=use_cache
+    )
 
     print(f"\nPage generation complete! Generated {len(generated)} pages in {output_dir}")
     return generated
 
 
 if __name__ == "__main__":
+    import argparse
+    
     # Default paths
     project_root = Path(__file__).parent.parent
-    data_path = project_root / "data" / "cyclic_peptide_drug_level_active.csv"
-    template_dir = project_root / "templates"
-    output_dir = project_root / "output" / "target_pages"
-
-    run_page_generation(str(data_path), str(template_dir), str(output_dir))
+    default_data_path = project_root / "data" / "cyclic_peptide_drug_level_active.csv"
+    default_template_dir = project_root / "templates"
+    default_output_dir = project_root / "output" / "target_pages"
+    
+    parser = argparse.ArgumentParser(
+        description="Generate target analysis pages for cyclic peptide drugs"
+    )
+    parser.add_argument(
+        "--data", "-d",
+        type=str,
+        default=str(default_data_path),
+        help="Path to the drug data CSV file"
+    )
+    parser.add_argument(
+        "--templates", "-t",
+        type=str,
+        default=str(default_template_dir),
+        help="Path to the templates directory"
+    )
+    parser.add_argument(
+        "--output", "-o",
+        type=str,
+        default=str(default_output_dir),
+        help="Output directory for generated HTML pages"
+    )
+    parser.add_argument(
+        "--min-drugs",
+        type=int,
+        default=1,
+        help="Minimum number of drugs required to generate a target page"
+    )
+    parser.add_argument(
+        "--llm-research",
+        action="store_true",
+        help="Enable AI-powered deep research using OpenAI GPT models"
+    )
+    parser.add_argument(
+        "--llm-api-key",
+        type=str,
+        default=None,
+        help="OpenAI API key (or set OPENAI_API_KEY env variable)"
+    )
+    parser.add_argument(
+        "--llm-model",
+        type=str,
+        default="gpt-4o",
+        help="OpenAI model to use (default: gpt-4o)"
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable caching of LLM research results"
+    )
+    
+    args = parser.parse_args()
+    
+    run_page_generation(
+        data_path=args.data,
+        template_dir=args.templates,
+        output_dir=args.output,
+        min_drugs=args.min_drugs,
+        enable_llm_research=args.llm_research,
+        llm_api_key=args.llm_api_key,
+        llm_model=args.llm_model,
+        use_cache=not args.no_cache
+    )
