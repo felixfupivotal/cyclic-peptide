@@ -466,14 +466,80 @@ def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cyclic Peptide Drug Target Analysis</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             background-color: #f5f5f5;
         }
+        .page-wrapper {
+            display: flex;
+            min-height: 100vh;
+        }
+        /* Navigation Sidebar */
+        .nav-sidebar {
+            width: 280px;
+            background: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%);
+            color: white;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            overflow-y: auto;
+            padding: 20px 0;
+            z-index: 1000;
+        }
+        .nav-sidebar h3 {
+            padding: 0 20px;
+            margin: 0 0 20px 0;
+            font-size: 1.1em;
+            color: #ecf0f1;
+            border-bottom: 1px solid #34495e;
+            padding-bottom: 15px;
+        }
+        .nav-section {
+            margin-bottom: 25px;
+        }
+        .nav-section-title {
+            padding: 8px 20px;
+            font-size: 0.75em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #95a5a6;
+            font-weight: 600;
+        }
+        .nav-link {
+            display: block;
+            padding: 10px 20px;
+            color: #bdc3c7;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+        .nav-link:hover {
+            background-color: rgba(255,255,255,0.1);
+            color: white;
+            border-left-color: #3498db;
+        }
+        .nav-link.highlight {
+            background-color: rgba(46, 204, 113, 0.2);
+            border-left-color: #2ecc71;
+        }
+        .nav-link.highlight:hover {
+            background-color: rgba(46, 204, 113, 0.3);
+        }
+        /* Main Content */
+        .main-content {
+            margin-left: 280px;
+            flex: 1;
+            padding: 30px;
+        }
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
             background-color: white;
             padding: 30px;
@@ -488,6 +554,27 @@ def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table:
         h2 {
             color: #34495e;
             margin-top: 30px;
+            padding-top: 20px;
+        }
+        .section {
+            scroll-margin-top: 20px;
+        }
+        .section-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: 600;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        .badge-all {
+            background-color: #3498db;
+            color: white;
+        }
+        .badge-filtered {
+            background-color: #2ecc71;
+            color: white;
         }
         .stats-grid {
             display: grid;
@@ -557,132 +644,212 @@ def generate_summary_html(df: pd.DataFrame, analysis_results: dict, pivot_table:
         .target-link:hover {
             text-decoration: underline;
         }
+        .filtered-section {
+            background: linear-gradient(135deg, #f8fff8 0%, #e8f5e9 100%);
+            border: 2px solid #2ecc71;
+            border-radius: 10px;
+            padding: 25px;
+            margin-top: 40px;
+        }
+        .filtered-section h2 {
+            color: #27ae60;
+            margin-top: 0;
+            padding-top: 0;
+        }
+        /* Responsive */
+        @media (max-width: 900px) {
+            .nav-sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .page-wrapper {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Cyclic Peptide Drug Target Analysis</h1>
+    <div class="page-wrapper">
+        <!-- Navigation Sidebar -->
+        <nav class="nav-sidebar">
+            <h3>Cyclic Peptide Analysis</h3>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value">""" + str(len(summary)) + """</div>
-                <div class="stat-label">Unique Targets</div>
+            <div class="nav-section">
+                <div class="nav-section-title">Overview</div>
+                <a href="#overview" class="nav-link">Key Statistics</a>
             </div>
-            <div class="stat-card">
-                <div class="stat-value">""" + str(summary['total_drugs'].sum()) + """</div>
-                <div class="stat-label">Total Drug-Target Pairs</div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">All Disease Areas</div>
+                <a href="#phase-distribution" class="nav-link">Phase Distribution</a>
+                <a href="#top-targets" class="nav-link">Top Targets</a>
+                <a href="#target-heatmap" class="nav-link">Target-Phase Heatmap</a>
+                <a href="#top-companies" class="nav-link">Top Companies</a>
+                <a href="#target-summary" class="nav-link">Target Summary Table</a>
+                <a href="#pivot-table" class="nav-link">Pivot Table</a>
             </div>
-            <div class="stat-card">
-                <div class="stat-value">""" + str(len(summary[summary['highest_phase'].isin(['phase 3', 'pre-registration', 'approved', 'launched'])])) + """</div>
-                <div class="stat-label">Targets with Late-Stage Drugs</div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Filtered by Therapeutic Area</div>
+                <a href="#immunology-endocrinology" class="nav-link highlight">Immunology & Endocrinology</a>
             </div>
-            <div class="stat-card">
-                <div class="stat-value">""" + str(sum(summary['company_count'])) + """</div>
-                <div class="stat-label">Total Company Involvements</div>
-            </div>
-        </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
+                <h1>Cyclic Peptide Drug Target Analysis</h1>
+
+                <!-- Overview Section -->
+                <section id="overview" class="section">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value">""" + str(len(summary)) + """</div>
+                            <div class="stat-label">Unique Targets</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">""" + str(summary['total_drugs'].sum()) + """</div>
+                            <div class="stat-label">Total Drug-Target Pairs</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">""" + str(len(summary[summary['highest_phase'].isin(['phase 3', 'pre-registration', 'approved', 'launched'])])) + """</div>
+                            <div class="stat-label">Targets with Late-Stage Drugs</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">""" + str(sum(summary['company_count'])) + """</div>
+                            <div class="stat-label">Total Company Involvements</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Phase Distribution -->
+                <section id="phase-distribution" class="section">
+                    <h2>Development Phase Distribution <span class="section-badge badge-all">All Disease Areas</span></h2>
+                    <div class="plot-container">
+                        <img src="plots/phase_distribution.png" alt="Phase Distribution">
+                        <br>
+                        <a href="plots/phase_distribution.html" class="interactive-link">View Interactive Chart</a>
+                    </div>
+                </section>
+
+                <!-- Top Targets -->
+                <section id="top-targets" class="section">
+                    <h2>Top Targets by Drug Count <span class="section-badge badge-all">All Disease Areas</span></h2>
+                    <div class="plot-container">
+                        <img src="plots/top_targets.png" alt="Top Targets">
+                        <br>
+                        <a href="plots/top_targets.html" class="interactive-link">View Interactive Chart</a>
+                    </div>
+                </section>
+
+                <!-- Target-Phase Heatmap -->
+                <section id="target-heatmap" class="section">
+                    <h2>Target-Phase Heatmap <span class="section-badge badge-all">All Disease Areas</span></h2>
+                    <div class="plot-container">
+                        <img src="plots/target_phase_heatmap.png" alt="Target Phase Heatmap">
+                        <br>
+                        <a href="plots/target_phase_heatmap.html" class="interactive-link">View Interactive Chart</a>
+                    </div>
+                </section>
+
+                <!-- Top Companies -->
+                <section id="top-companies" class="section">
+                    <h2>Top Companies <span class="section-badge badge-all">All Disease Areas</span></h2>
+                    <div class="plot-container">
+                        <img src="plots/top_companies.png" alt="Top Companies">
+                        <br>
+                        <a href="plots/top_companies.html" class="interactive-link">View Interactive Chart</a>
+                    </div>
+                </section>
+
+                <!-- Target Summary Table -->
+                <section id="target-summary" class="section">
+                    <h2>Target Summary Table <span class="section-badge badge-all">All Disease Areas</span></h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Target</th>
+                                <th>Total Drugs</th>
+                                <th>Highest Phase</th>
+                                <th>Companies</th>
+                                <th>Therapeutic Areas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+"""
+
+    for _, row in summary.head(50).iterrows():
+        target_filename = row['target'].replace('/', '_').replace(' ', '_').replace('α', 'alpha').replace('β', 'beta')
+        target_filename = ''.join(c for c in target_filename if c.isalnum() or c in '_-')
+        html_content += f"""
+                            <tr>
+                                <td><a href="target_pages/{target_filename}.html" class="target-link">{row['target']}</a></td>
+                                <td>{row['total_drugs']}</td>
+                                <td>{row['highest_phase_display']}</td>
+                                <td>{row['company_count']}</td>
+                                <td>{', '.join(row['therapeutic_areas'][:3])}</td>
+                            </tr>
+"""
+
+    html_content += """
+                        </tbody>
+                    </table>
+                    <p><em>Click on target names to view detailed analysis pages.</em></p>
+                </section>
+
+                <!-- Pivot Table -->
+                <section id="pivot-table" class="section">
+                    <h2>Pivot Table: Targets by Phase <span class="section-badge badge-all">All Disease Areas</span></h2>
+                    """ + pivot_table.head(30).to_html(index=False, classes='pivot-table') + """
+                </section>
 
 """
 
-    # Add filtered targets section for Immunology and Endocrinology & Metabolism
+    # Add filtered targets section for Immunology and Endocrinology & Metabolism at the end
     if not filtered_targets.empty:
         html_content += """
-        <h2>Targets with Immunology or Endocrinology & Metabolism Indications</h2>
-        <p>The following targets have drugs with indications in Immunology or Endocrinology & Metabolism therapeutic areas.</p>
-        <table>
-            <thead>
-                <tr>
-                    <th>Target</th>
-                    <th>Drug Count</th>
-                    <th>Highest Phase</th>
-                    <th>Therapeutic Areas</th>
-                    <th>Key Indications</th>
-                </tr>
-            </thead>
-            <tbody>
+                <!-- Immunology & Endocrinology Section -->
+                <section id="immunology-endocrinology" class="section filtered-section">
+                    <h2>Targets with Immunology or Endocrinology & Metabolism Indications <span class="section-badge badge-filtered">Filtered</span></h2>
+                    <p>The following targets have drugs with indications in <strong>Immunology</strong> or <strong>Endocrinology & Metabolism</strong> therapeutic areas.</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Target</th>
+                                <th>Drug Count</th>
+                                <th>Highest Phase</th>
+                                <th>Therapeutic Areas</th>
+                                <th>Key Indications</th>
+                            </tr>
+                        </thead>
+                        <tbody>
 """
         for _, row in filtered_targets.iterrows():
             target_filename = row['target'].replace('/', '_').replace(' ', '_').replace('α', 'alpha').replace('β', 'beta')
             target_filename = ''.join(c for c in target_filename if c.isalnum() or c in '_-')
             html_content += f"""
-                <tr>
-                    <td><a href="target_pages/{target_filename}.html" class="target-link">{row['target']}</a></td>
-                    <td>{row['drug_count']}</td>
-                    <td>{row['highest_phase_display']}</td>
-                    <td>{', '.join(row['therapeutic_areas'])}</td>
-                    <td>{', '.join(row['indications'][:3])}</td>
-                </tr>
+                            <tr>
+                                <td><a href="target_pages/{target_filename}.html" class="target-link">{row['target']}</a></td>
+                                <td>{row['drug_count']}</td>
+                                <td>{row['highest_phase_display']}</td>
+                                <td>{', '.join(row['therapeutic_areas'])}</td>
+                                <td>{', '.join(row['indications'][:3])}</td>
+                            </tr>
 """
         html_content += """
-            </tbody>
-        </table>
-        <p><em>This table shows """ + str(len(filtered_targets)) + """ targets with indications in Immunology or Endocrinology & Metabolism.</em></p>
+                        </tbody>
+                    </table>
+                    <p><em>This table shows """ + str(len(filtered_targets)) + """ targets with indications in Immunology or Endocrinology & Metabolism.</em></p>
+                </section>
 """
 
     html_content += """
-        <h2>Development Phase Distribution</h2>
-        <div class="plot-container">
-            <img src="plots/phase_distribution.png" alt="Phase Distribution">
-            <br>
-            <a href="plots/phase_distribution.html" class="interactive-link">View Interactive Chart</a>
-        </div>
-
-        <h2>Top Targets by Drug Count</h2>
-        <div class="plot-container">
-            <img src="plots/top_targets.png" alt="Top Targets">
-            <br>
-            <a href="plots/top_targets.html" class="interactive-link">View Interactive Chart</a>
-        </div>
-
-        <h2>Target-Phase Heatmap</h2>
-        <div class="plot-container">
-            <img src="plots/target_phase_heatmap.png" alt="Target Phase Heatmap">
-            <br>
-            <a href="plots/target_phase_heatmap.html" class="interactive-link">View Interactive Chart</a>
-        </div>
-
-        <h2>Top Companies</h2>
-        <div class="plot-container">
-            <img src="plots/top_companies.png" alt="Top Companies">
-            <br>
-            <a href="plots/top_companies.html" class="interactive-link">View Interactive Chart</a>
-        </div>
-
-        <h2>Target Summary Table</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Target</th>
-                    <th>Total Drugs</th>
-                    <th>Highest Phase</th>
-                    <th>Companies</th>
-                    <th>Therapeutic Areas</th>
-                </tr>
-            </thead>
-            <tbody>
-"""
-
-    for _, row in summary.head(50).iterrows():
-        target_filename = row['target'].replace('/', '_').replace(' ', '_').replace('α', 'alpha').replace('β', 'beta')
-        html_content += f"""
-                <tr>
-                    <td><a href="target_pages/{target_filename}.html" class="target-link">{row['target']}</a></td>
-                    <td>{row['total_drugs']}</td>
-                    <td>{row['highest_phase_display']}</td>
-                    <td>{row['company_count']}</td>
-                    <td>{', '.join(row['therapeutic_areas'][:3])}</td>
-                </tr>
-"""
-
-    html_content += """
-            </tbody>
-        </table>
-
-        <p><em>Click on target names to view detailed analysis pages.</em></p>
-
-        <h2>Pivot Table: Targets by Phase</h2>
-        """ + pivot_table.head(30).to_html(index=False, classes='pivot-table') + """
-
+            </div>
+        </main>
     </div>
 </body>
 </html>
